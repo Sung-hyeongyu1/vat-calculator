@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>부가세 계산기</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #111827;
+    --sub: #6b7280;
+    --faint: #9ca3af;
+    --line: #eceef1;
+    --field: #f3f4f6;
+    --accent: #3b5bdb;
+    --danger: #e03131;
+    --radius: 16px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --surface: #171a21;
+      --text: #f1f3f5;
+      --sub: #9aa1ac;
+      --faint: #6b7280;
+      --line: #252a33;
+      --field: #1f232c;
+      --accent: #748ffc;
+      --danger: #ff6b6b;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 56px 16px 40px;
+  }
+  .wrap { max-width: 420px; margin: 0 auto; }
+  .num { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+  header { margin-bottom: 24px; }
+  h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--sub); font-size: .9rem; }
+
+  .panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 16px rgba(16, 24, 40, .04);
+  }
+
+  /* 입력 방식 토글 */
+  .segment {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--field);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+  .segment::before {
+    content: "";
+    position: absolute;
+    top: 4px; bottom: 4px; left: 4px;
+    width: calc(50% - 4px);
+    background: var(--surface);
+    border-radius: 7px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+    transition: transform .2s ease;
+  }
+  .segment:has(input[value="total"]:checked)::before { transform: translateX(100%); }
+  .segment label {
+    position: relative;
+    text-align: center;
+    padding: 9px 0;
+    font-size: .9rem;
+    color: var(--sub);
+    cursor: pointer;
+    user-select: none;
+    transition: color .2s;
+  }
+  .segment input { position: absolute; opacity: 0; pointer-events: none; }
+  .segment label:has(input:checked) { color: var(--text); font-weight: 600; }
+  .segment label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 7px; }
+
+  /* 금액 입력 */
+  .field {
+    display: flex;
+    align-items: center;
+    background: var(--field);
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    padding: 0 16px;
+    transition: border-color .15s, background .15s;
+  }
+  .field:focus-within { border-color: var(--accent); background: var(--surface); }
+  .field input {
+    flex: 1; min-width: 0;
+    border: 0; background: transparent; outline: none;
+    color: var(--text);
+    font: inherit; font-size: 1.35rem; font-weight: 600;
+    text-align: right;
+    padding: 14px 8px 14px 0;
+  }
+  .field input::placeholder { color: var(--faint); font-weight: 400; }
+  .field span { color: var(--sub); font-size: 1rem; }
+  .error { color: var(--danger); font-size: .82rem; min-height: 1.1em; margin: 8px 2px 0; }
+
+  .calc {
+    width: 100%;
+    margin-top: 8px;
+    padding: 14px;
+    border: 0; border-radius: 12px;
+    background: var(--accent); color: #fff;
+    font: inherit; font-size: 1rem; font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s, transform .05s;
+  }
+  .calc:hover { filter: brightness(1.07); }
+  .calc:active { transform: scale(.99); }
+
+  /* 결과 */
+  .result { margin-top: 12px; }
+  .total-label { color: var(--sub); font-size: .85rem; margin-bottom: 4px; }
+  .total-value { font-size: 2rem; font-weight: 700; margin-bottom: 16px; word-break: break-all; }
+  .total-value small { font-size: 1.1rem; font-weight: 500; color: var(--sub); margin-left: 2px; }
+  .breakdown { border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
+  .breakdown div { display: flex; justify-content: space-between; padding: 6px 0; font-size: .95rem; }
+  .breakdown dt { color: var(--sub); }
+  .breakdown dd { margin: 0; font-weight: 500; }
+
+  /* 기록 */
+  .history { margin-top: 32px; }
+  .history-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 10px; }
+  .history-head h2 { font-size: .95rem; font-weight: 600; margin: 0; }
+  .text-btn {
+    background: none; border: 0; padding: 0;
+    color: var(--faint); font: inherit; font-size: .82rem; cursor: pointer;
+  }
+  .text-btn:hover { color: var(--danger); }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  li:last-child { border-bottom: 0; }
+  .history .panel { padding: 4px 0; }
+  .item { flex: 1; min-width: 0; cursor: pointer; }
+  .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .item-total { font-weight: 600; font-size: 1rem; }
+  .item-time { color: var(--faint); font-size: .75rem; white-space: nowrap; }
+  .item-sub { color: var(--sub); font-size: .8rem; margin-top: 3px; }
+  .badge {
+    display: inline-block; font-size: .7rem; padding: 1px 6px; margin-right: 6px;
+    border-radius: 4px; background: var(--field); color: var(--sub);
+  }
+  .del {
+    flex: none;
+    background: none; border: 0; border-radius: 8px;
+    padding: 6px 8px;
+    color: var(--faint); font: inherit; font-size: .8rem;
+    cursor: pointer;
+    transition: color .15s, background .15s;
+  }
+  .del:hover { color: var(--danger); background: var(--field); }
+  .empty { color: var(--faint); font-size: .88rem; text-align: center; padding: 28px 0; margin: 0; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>부가세 계산기</h1>
+    <p>부가가치세 10% 기준</p>
+  </header>
+
+  <section class="panel">
+    <form id="form" novalidate>
+      <div class="segment" role="radiogroup" aria-label="입력 방식">
+        <label><input type="radio" name="mode" value="supply" checked>공급가액 입력</label>
+        <label><input type="radio" name="mode" value="total">합계금액 입력</label>
+      </div>
+      <div class="field">
+        <input id="amount" class="num" type="text" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="금액">
+        <span>원</span>
+      </div>
+      <p class="error" id="error" role="alert"></p>
+      <button class="calc" type="submit">계산하기</button>
+    </form>
+  </section>
+
+  <section class="panel result" aria-live="polite">
+    <div class="total-label">합계금액</div>
+    <div class="total-value num" id="r-total">0<small>원</small></div>
+    <dl class="breakdown">
+      <div><dt>공급가액</dt><dd class="num" id="r-supply">0원</dd></div>
+      <div><dt>부가세 (10%)</dt><dd class="num" id="r-vat">0원</dd></div>
+    </dl>
+  </section>
+
+  <section class="history">
+    <div class="history-head">
+      <h2>계산 기록</h2>
+      <button class="text-btn" id="clear" type="button">전체 삭제</button>
+    </div>
+    <div class="panel">
+      <ul id="history"></ul>
+      <p class="empty" id="empty">아직 계산 기록이 없습니다.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+  const STORAGE_KEY = 'vat-calculator-history';
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n.toLocaleString('ko-KR');
+  const won = (n) => fmt(n) + '원';
+
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (e) { history = []; }
+  const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); } catch (e) {} };
+
+  // 입력하는 동안 천 단위 쉼표 표시
+  const amountInput = $('amount');
+  amountInput.addEventListener('input', () => {
+    const digits = amountInput.value.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+    amountInput.value = digits ? fmt(Number(digits)) : '';
+    $('error').textContent = '';
+  });
+
+  function calculate(amount, mode) {
+    let supply, total;
+    if (mode === 'supply') {
+      supply = amount;
+      total = supply + Math.round(supply / 10);   // 합계 = 공급가액 × 1.1 (원 단위 반올림)
+    } else {
+      total = amount;
+      supply = Math.round(total * 10 / 11);       // 공급가액 = 합계 ÷ 1.1 (원 단위 반올림)
+    }
+    const vat = total - supply;                   // 부가세 = 합계 − 공급가액
+    return { supply, vat, total };
+  }
+
+  function showResult(r) {
+    $('r-total').innerHTML = `${fmt(r.total)}<small>원</small>`;
+    $('r-supply').textContent = won(r.supply);
+    $('r-vat').textContent = won(r.vat);
+  }
+
+  function renderHistory() {
+    const ul = $('history');
+    ul.innerHTML = '';
+    $('empty').hidden = history.length > 0;
+    $('clear').hidden = history.length === 0;
+
+    history.forEach((h) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div class="item" title="결과 다시 보기">
+          <div class="item-top">
+            <span class="item-total num">${won(h.total)}</span>
+            <span class="item-time num">${h.time}</span>
+          </div>
+          <div class="item-sub num">
+            <span class="badge">${h.mode === 'supply' ? '공급가액 입력' : '합계금액 입력'}</span>공급가액 ${won(h.supply)} · 부가세 ${won(h.vat)}
+          </div>
+        </div>
+        <button class="del" type="button" aria-label="이 기록 삭제">삭제</button>`;
+      li.querySelector('.del').addEventListener('click', () => {
+        history = history.filter((x) => x.id !== h.id);
+        save(); renderHistory();
+      });
+      li.querySelector('.item').addEventListener('click', () => showResult(h));
+      ul.appendChild(li);
+    });
+  }
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = Number(amountInput.value.replace(/[^\d]/g, ''));
+    if (!amount) { $('error').textContent = '0보다 큰 금액을 입력해 주세요.'; amountInput.focus(); return; }
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const r = calculate(amount, mode);
+    showResult(r);
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    history.unshift({
+      id: Date.now() + Math.random(), mode, ...r,
+      time: `${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+    });
+    save(); renderHistory();
+  });
+
+  $('clear').addEventListener('click', () => { history = []; save(); renderHistory(); });
+
+  renderHistory();
+</script>
+</body>
+</html>
